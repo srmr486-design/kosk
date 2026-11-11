@@ -452,37 +452,54 @@
                 <svg class="w-5 h-5 text-emerald-600 dark:text-emerald-400" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
                 </svg>
-                구글 스프레드시트 + 드라이브 연동
+                구글 드라이브 폴더 & 학사일정 시트 연동
               </h4>
               <span class="text-[11px] px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 font-semibold">10분 자동 캐싱</span>
             </div>
             
             <p class="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-              구글 시트의 [파일 ➔ 공유 ➔ 웹에 게시]에서 <strong>CSV 형식</strong> 링크를 입력하세요.<br>
-              시트에는 파일명, 구글 드라이브 공유 링크(view?usp=sharing), 일정 등을 작성합니다.
+              <strong>동영상/배경음악:</strong> 구글 드라이브 폴더의 공유 링크(또는 시트 CSV 링크)를 넣으면 폴더 내 파일들을 자동으로 감지하여 다운로드 및 캐싱합니다.<br>
+              <strong>학사일정:</strong> 구글 스프레드시트(CSV) 링크를 입력하거나 아래 샘플 양식을 다운받아 작성하세요.
             </p>
 
             <div class="space-y-3">
               <div>
-                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">동영상 시트 CSV URL (또는 Google Sheet ID)</label>
-                <input type="text" id="cfg-sheet-videos" placeholder="https://docs.google.com/spreadsheets/d/.../pub?output=csv" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-mono">
+                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  동영상 구글 드라이브 폴더 링크 (또는 시트 CSV URL)
+                </label>
+                <input type="text" id="cfg-sheet-videos" placeholder="https://drive.google.com/drive/folders/폴더ID?usp=sharing" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-mono">
+                <span class="text-[10px] text-slate-500 dark:text-slate-400">구글 드라이브 폴더를 '링크가 있는 모든 사용자에게 보기'로 공유한 뒤 링크를 붙여넣으세요.</span>
               </div>
 
               <div>
-                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">배경음악(BGM) 시트 CSV URL (선택 사항)</label>
-                <input type="text" id="cfg-sheet-audios" placeholder="https://docs.google.com/spreadsheets/d/.../pub?gid=...&output=csv" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-mono">
+                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  배경음악(BGM) 구글 드라이브 폴더 링크 (또는 시트 CSV URL)
+                </label>
+                <input type="text" id="cfg-sheet-audios" placeholder="https://drive.google.com/drive/folders/폴더ID?usp=sharing" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-mono">
+                <span class="text-[10px] text-slate-500 dark:text-slate-400">MP3 등의 음악 파일이 담긴 구글 드라이브 폴더 링크를 입력하세요.</span>
               </div>
 
               <div>
-                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">학사일정 시트 CSV URL (선택 사항)</label>
-                <input type="text" id="cfg-sheet-schedules" placeholder="https://docs.google.com/spreadsheets/d/.../pub?gid=...&output=csv" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-mono">
+                <div class="flex items-center justify-between mb-1">
+                  <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                    학사일정 시트 CSV URL (웹에 게시 링크)
+                  </label>
+                  <!-- 학사일정 샘플 파일 다운로드 버튼 -->
+                  <button type="button" id="btn-download-schedule-sample" class="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 dark:text-blue-400 hover:underline">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                    </svg>
+                    학사일정 CSV 샘플 양식 다운로드
+                  </button>
+                </div>
+                <input type="text" id="cfg-sheet-schedules" placeholder="https://docs.google.com/spreadsheets/d/.../pub?output=csv" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-mono">
               </div>
             </div>
 
             <div class="flex items-center justify-between pt-2">
-              <span class="text-[11px] text-slate-500">CORS 방지 프록시 및 다이렉트 변환 자동 지원</span>
+              <span class="text-[11px] text-slate-500">드라이브 폴더 직접 조회 및 자동 변환 캐싱 지원</span>
               <button type="button" id="btn-modal-test-sync" class="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow transition">
-                지금 시트 연결 테스트
+                지금 클라우드 연결 테스트
               </button>
             </div>
           </div>
@@ -851,10 +868,23 @@
     const syncStatusMsg = document.getElementById('sync-status-msg');
     const syncLastTime = document.getElementById('sync-last-time');
     const syncIcon = document.getElementById('sync-icon');
+    const btnDownloadScheduleSample = document.getElementById('btn-download-schedule-sample');
 
     // -------------------------------------------------------------
-    // 2. 구글 드라이브 URL 변환 유틸리티
+    // 2. 구글 드라이브 및 폴더 ID 추출 유틸리티
     // -------------------------------------------------------------
+    function extractGoogleDriveFolderId(rawUrl) {
+      if (!rawUrl) return null;
+      rawUrl = rawUrl.trim();
+      // 폴더 링크: https://drive.google.com/drive/folders/FOLDER_ID
+      const match = rawUrl.match(/\/folders\/([a-zA-Z0-9_-]+)/);
+      if (match) return match[1];
+      // 폴더 파라미터 id: id=FOLDER_ID
+      const matchParam = rawUrl.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+      if (matchParam && rawUrl.includes('folders')) return matchParam[1];
+      return null;
+    }
+
     function extractGoogleDriveFileId(rawUrl) {
       if (!rawUrl) return null;
       rawUrl = rawUrl.trim();
@@ -868,13 +898,76 @@
     }
 
     function buildGoogleDriveDirectDownloadUrls(fileId) {
-      // 1순위: 직접 uc 다운로드 링크
-      // 2순위: CORS 우회 프록시
       return [
         `https://drive.google.com/uc?export=download&id=${fileId}`,
         `https://docs.google.com/uc?export=download&id=${fileId}`,
         `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://drive.google.com/uc?export=download&id=${fileId}`)}`
       ];
+    }
+
+    // 구글 드라이브 공개 폴더 내 파일 목록 크롤링/파싱 (백엔드 없는 순수 프론트엔드 모델)
+    async function fetchFilesFromDriveFolder(folderId, typeFilter = 'video') {
+      const folderUrl = `https://drive.google.com/embeddedfolderview?id=${folderId}#list`;
+      const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(folderUrl)}`;
+
+      try {
+        const response = await fetch(proxyUrl);
+        if (!response.ok) return [];
+        const json = await response.json();
+        const html = json.contents || '';
+
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        const items = [];
+
+        // embeddedfolderview의 항목 파싱
+        const entries = doc.querySelectorAll('.flip-entry, tr, a[href*="/file/d/"]');
+        entries.forEach(entry => {
+          const a = entry.tagName === 'A' ? entry : entry.querySelector('a[href*="/file/d/"]');
+          if (a) {
+            const href = a.getAttribute('href') || '';
+            const fileId = extractGoogleDriveFileId(href);
+            const title = (a.textContent || a.getAttribute('title') || '').trim();
+            if (fileId && title) {
+              const lower = title.toLowerCase();
+              let isMatch = false;
+              if (typeFilter === 'video') {
+                isMatch = lower.endsWith('.mp4') || lower.endsWith('.webm') || lower.endsWith('.mov') || lower.endsWith('.mkv');
+              } else if (typeFilter === 'audio') {
+                isMatch = lower.endsWith('.mp3') || lower.endsWith('.wav') || lower.endsWith('.ogg') || lower.endsWith('.m4a');
+              }
+              if (isMatch && !items.some(x => x.fileId === fileId)) {
+                items.push({ name: title, fileId: fileId, link: `https://drive.google.com/file/d/${fileId}/view` });
+              }
+            }
+          }
+        });
+
+        // 텍스트 기반 보조 정규식 파싱
+        if (items.length === 0) {
+          const regex = /"([a-zA-Z0-9_-]{25,})"[^"]*?"([^"]+?\.(mp4|webm|mov|mp3|wav|ogg|m4a))"/gi;
+          let m;
+          while ((m = regex.exec(html)) !== null) {
+            const fileId = m[1];
+            const title = m[2];
+            const lower = title.toLowerCase();
+            let isMatch = false;
+            if (typeFilter === 'video') {
+              isMatch = lower.endsWith('.mp4') || lower.endsWith('.webm') || lower.endsWith('.mov');
+            } else if (typeFilter === 'audio') {
+              isMatch = lower.endsWith('.mp3') || lower.endsWith('.wav') || lower.endsWith('.ogg') || lower.endsWith('.m4a');
+            }
+            if (isMatch && !items.some(x => x.fileId === fileId)) {
+              items.push({ name: title, fileId: fileId, link: `https://drive.google.com/file/d/${fileId}/view` });
+            }
+          }
+        }
+
+        return items;
+      } catch (e) {
+        console.warn('폴더 파싱 실패:', e);
+        return [];
+      }
     }
 
     // CSV 파서 (따옴표 및 줄바꿈 지원)
@@ -929,107 +1022,134 @@
       let updateCount = 0;
 
       try {
-        // [A] 동영상 동기화
+        // [A] 동영상 동기화 (구글 드라이브 폴더 링크 또는 시트 CSV URL 지원)
         if (state.sheetVideosUrl) {
           const vidUrl = state.sheetVideosUrl.trim();
-          const targetUrl = vidUrl.includes('output=csv') ? vidUrl : (vidUrl.includes('docs.google.com') ? vidUrl.replace(/\/edit.*$/, '/pub?output=csv') : vidUrl);
-          const res = await fetch(targetUrl);
-          if (res.ok) {
-            const csvText = await res.text();
-            const rows = parseCSV(csvText);
-            // 헤더 감지: 파일명, 링크 (열 순서 유동 지원)
-            if (rows.length > 1) {
-              const dataRows = rows.slice(1);
-              const newVideos = [];
+          const folderId = extractGoogleDriveFolderId(vidUrl);
+          let videoItems = [];
 
-              for (const r of dataRows) {
-                if (r.length < 2) continue;
-                const name = r[0] || '영상';
-                const link = r[1] || '';
-                const fileId = extractGoogleDriveFileId(link);
-                if (!fileId && !link.startsWith('http')) continue;
-
-                // 기존 IndexedDB/State에 동일 파일이 캐싱되어 있는지 확인
-                const existing = state.videos.find(v => v.sourceUrl === link || (fileId && v.fileId === fileId));
-                if (existing && existing.blob) {
-                  newVideos.push(existing);
-                } else {
-                  // 신규 파일 다운로드
-                  if (syncStatusMsg) syncStatusMsg.textContent = `동영상 캐싱 다운로드 중: ${name}`;
-                  const blob = await fetchMediaBlob(link, fileId, 'video/mp4');
-                  if (blob) {
-                    newVideos.push({
-                      id: 'gdrive_vid_' + fileId,
-                      fileId: fileId,
-                      name: name,
-                      size: blob.size,
-                      type: blob.type || 'video/mp4',
-                      blob: blob,
-                      url: URL.createObjectURL(blob),
-                      sourceUrl: link
-                    });
-                    updateCount++;
+          if (folderId) {
+            // 1. 구글 드라이브 폴더 링크인 경우
+            if (syncStatusMsg) syncStatusMsg.textContent = '구글 드라이브 동영상 폴더 스캔 중...';
+            videoItems = await fetchFilesFromDriveFolder(folderId, 'video');
+          } else {
+            // 2. 구글 시트 CSV 링크인 경우
+            const targetUrl = vidUrl.includes('output=csv') ? vidUrl : (vidUrl.includes('docs.google.com') ? vidUrl.replace(/\/edit.*$/, '/pub?output=csv') : vidUrl);
+            const res = await fetch(targetUrl);
+            if (res.ok) {
+              const csvText = await res.text();
+              const rows = parseCSV(csvText);
+              if (rows.length > 1) {
+                rows.slice(1).forEach(r => {
+                  if (r.length >= 2) {
+                    const name = r[0] || '영상';
+                    const link = r[1] || '';
+                    const fileId = extractGoogleDriveFileId(link);
+                    if (fileId || link.startsWith('http')) {
+                      videoItems.push({ name, fileId, link });
+                    }
                   }
-                }
-                if (newVideos.length >= 20) break; // 최대 20개 제한
+                });
               }
+            }
+          }
 
-              if (newVideos.length > 0) {
-                state.videos = newVideos;
-                await dbSaveAllVideos(state.videos);
-                renderVideoList();
+          if (videoItems.length > 0) {
+            const newVideos = [];
+            for (const item of videoItems) {
+              const existing = state.videos.find(v => v.sourceUrl === item.link || (item.fileId && v.fileId === item.fileId));
+              if (existing && existing.blob) {
+                newVideos.push(existing);
+              } else {
+                if (syncStatusMsg) syncStatusMsg.textContent = `동영상 캐싱 다운로드 중: ${item.name}`;
+                const blob = await fetchMediaBlob(item.link, item.fileId, 'video/mp4');
+                if (blob) {
+                  newVideos.push({
+                    id: 'gdrive_vid_' + (item.fileId || Date.now()),
+                    fileId: item.fileId,
+                    name: item.name,
+                    size: blob.size,
+                    type: blob.type || 'video/mp4',
+                    blob: blob,
+                    url: URL.createObjectURL(blob),
+                    sourceUrl: item.link
+                  });
+                  updateCount++;
+                }
               }
+              if (newVideos.length >= 20) break; // 최대 20개 제한
+            }
+
+            if (newVideos.length > 0) {
+              state.videos = newVideos;
+              await dbSaveAllVideos(state.videos);
+              renderVideoList();
             }
           }
         }
 
-        // [B] 배경음악(BGM) 동기화
+        // [B] 배경음악(BGM) 동기화 (구글 드라이브 폴더 링크 또는 시트 CSV URL 지원)
         if (state.sheetAudiosUrl) {
           const audUrl = state.sheetAudiosUrl.trim();
-          const targetUrl = audUrl.includes('output=csv') ? audUrl : (audUrl.includes('docs.google.com') ? audUrl.replace(/\/edit.*$/, '/pub?output=csv') : audUrl);
-          const res = await fetch(targetUrl);
-          if (res.ok) {
-            const csvText = await res.text();
-            const rows = parseCSV(csvText);
-            if (rows.length > 1) {
-              const dataRows = rows.slice(1);
-              const newAudios = [];
+          const folderId = extractGoogleDriveFolderId(audUrl);
+          let audioItems = [];
 
-              for (const r of dataRows) {
-                if (r.length < 2) continue;
-                const name = r[0] || '음악';
-                const link = r[1] || '';
-                const fileId = extractGoogleDriveFileId(link);
-                if (!fileId && !link.startsWith('http')) continue;
-
-                const existing = state.bgmList.find(a => a.sourceUrl === link || (fileId && a.fileId === fileId));
-                if (existing && existing.blob) {
-                  newAudios.push(existing);
-                } else {
-                  if (syncStatusMsg) syncStatusMsg.textContent = `BGM 캐싱 다운로드 중: ${name}`;
-                  const blob = await fetchMediaBlob(link, fileId, 'audio/mpeg');
-                  if (blob) {
-                    newAudios.push({
-                      id: 'gdrive_aud_' + fileId,
-                      fileId: fileId,
-                      name: name,
-                      size: blob.size,
-                      type: blob.type || 'audio/mpeg',
-                      blob: blob,
-                      url: URL.createObjectURL(blob),
-                      sourceUrl: link
-                    });
-                    updateCount++;
+          if (folderId) {
+            // 1. 구글 드라이브 폴더 링크인 경우
+            if (syncStatusMsg) syncStatusMsg.textContent = '구글 드라이브 BGM 폴더 스캔 중...';
+            audioItems = await fetchFilesFromDriveFolder(folderId, 'audio');
+          } else {
+            // 2. 구글 시트 CSV 링크인 경우
+            const targetUrl = audUrl.includes('output=csv') ? audUrl : (audUrl.includes('docs.google.com') ? audUrl.replace(/\/edit.*$/, '/pub?output=csv') : audUrl);
+            const res = await fetch(targetUrl);
+            if (res.ok) {
+              const csvText = await res.text();
+              const rows = parseCSV(csvText);
+              if (rows.length > 1) {
+                rows.slice(1).forEach(r => {
+                  if (r.length >= 2) {
+                    const name = r[0] || '음악';
+                    const link = r[1] || '';
+                    const fileId = extractGoogleDriveFileId(link);
+                    if (fileId || link.startsWith('http')) {
+                      audioItems.push({ name, fileId, link });
+                    }
                   }
-                }
-                if (newAudios.length >= 100) break;
+                });
               }
+            }
+          }
 
-              if (newAudios.length > 0) {
-                state.bgmList = newAudios;
-                await dbSaveAllAudios(state.bgmList);
-                renderBgmList();
+          if (audioItems.length > 0) {
+            const newAudios = [];
+            for (const item of audioItems) {
+              const existing = state.bgmList.find(a => a.sourceUrl === item.link || (item.fileId && a.fileId === item.fileId));
+              if (existing && existing.blob) {
+                newAudios.push(existing);
+              } else {
+                if (syncStatusMsg) syncStatusMsg.textContent = `BGM 캐싱 다운로드 중: ${item.name}`;
+                const blob = await fetchMediaBlob(item.link, item.fileId, 'audio/mpeg');
+                if (blob) {
+                  newAudios.push({
+                    id: 'gdrive_aud_' + (item.fileId || Date.now()),
+                    fileId: item.fileId,
+                    name: item.name,
+                    size: blob.size,
+                    type: blob.type || 'audio/mpeg',
+                    blob: blob,
+                    url: URL.createObjectURL(blob),
+                    sourceUrl: item.link
+                  });
+                  updateCount++;
+                }
               }
+              if (newAudios.length >= 100) break;
+            }
+
+            if (newAudios.length > 0) {
+              state.bgmList = newAudios;
+              await dbSaveAllAudios(state.bgmList);
+              renderBgmList();
             }
           }
         }
@@ -1780,6 +1900,30 @@
       state.sheetSchedulesUrl = cfgSheetSchedules.value.trim();
       syncCloudSpreadsheet(true);
     });
+
+    // 학사일정 CSV 샘플 파일 다운로드 (Excel/구글시트 호환 UTF-8 BOM 탑재)
+    if (btnDownloadScheduleSample) {
+      btnDownloadScheduleSample.addEventListener('click', () => {
+        const sampleCsvContent = "\uFEFF날짜,일정내용,시간\n" +
+          "2026-10-01,국군의 날 기념식,09:00\n" +
+          "2026-10-09,한글날 공휴일,\n" +
+          "2026-10-15,2학기 1차 지필평가 (중간고사),08:40\n" +
+          "2026-10-16,2학기 1차 지필평가 2일차,08:40\n" +
+          "2026-10-23,순천공고 취업박람회 및 진로체험의 날,13:30\n" +
+          "2026-10-30,학교운영위원회 및 학부모 상담,\n";
+
+        const blob = new Blob([sampleCsvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = '순천공고_학사일정_양식_샘플.csv';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showFloatingToast('학사일정 CSV 샘플 양식이 다운로드되었습니다.');
+      });
+    }
 
     btnManualSync.addEventListener('click', () => {
       syncCloudSpreadsheet(true);
