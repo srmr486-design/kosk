@@ -1,0 +1,1967 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>순천공업고등학교 행정실 키오스크 (스마트 클라우드 동기화)</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- 구글 폰트 로드 -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Nanum+Gothic:wght@400;700;800&family=Noto+Sans+KR:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eff6ff',
+              100: '#dbeafe',
+              500: '#3b82f6',
+              600: '#2563eb',
+              700: '#1d4ed8',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* 기본 스크롤바 숨김 (키오스크 터치스크린 특화) */
+    ::-webkit-scrollbar {
+      display: none;
+    }
+    * {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* 폰트 클래스 */
+    .font-noto { font-family: 'Noto Sans KR', sans-serif; }
+    .font-nanum { font-family: 'Nanum Gothic', sans-serif; }
+    .font-gowun { font-family: 'Gowun Dodum', sans-serif; }
+    .font-system { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+
+    /* 글래스모피즘 효과 */
+    .glass-panel {
+      background: rgba(255, 255, 255, 0.65);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.5);
+    }
+    .dark .glass-panel {
+      background: rgba(17, 24, 39, 0.75);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    /* 부드러운 전환 효과 */
+    .fade-enter {
+      animation: fadeIn 0.35s ease-out forwards;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: scale(0.99); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
+    /* 화면 모드별 컨테이너 스타일링 */
+    .mode-responsive {
+      width: 100vw;
+      height: 100vh;
+      max-width: 100vw;
+      max-height: 100vh;
+      margin: 0 auto;
+    }
+
+    .mode-fixed-portrait {
+      width: min(100vw, calc(100vh * (1080 / 1920)));
+      height: min(100vh, calc(100vw * (1920 / 1080)));
+      aspect-ratio: 1080 / 1920;
+      margin: auto;
+      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.3);
+      position: relative;
+    }
+
+    /* 비디오 화면 꽉 채움 강제 스타일 (720p/1080p 레터박스 방지) */
+    #kiosk-video {
+      width: 100% !important;
+      height: 100% !important;
+      max-width: 100% !important;
+      max-height: 100% !important;
+      object-fit: cover !important;
+      object-position: center center !important;
+      display: block;
+      transform: translateZ(0);
+      will-change: transform;
+      backface-visibility: hidden;
+    }
+
+    #weather-banner {
+      transform: translateZ(0);
+      will-change: transform, opacity;
+    }
+
+    .calendar-container-query {
+      container-type: inline-size;
+      container-name: calendar-view;
+    }
+
+    .responsive-calendar-title {
+      font-size: clamp(1.25rem, 4.2cqw + 0.4rem, 3.25rem);
+      line-height: 1.15;
+    }
+
+    #cal-days-grid {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      grid-template-rows: repeat(6, minmax(0, 1fr));
+      height: 100%;
+    }
+
+    .schedule-badge-wrap {
+      word-break: break-all;
+      overflow-wrap: anywhere;
+    }
+  </style>
+</head>
+<body class="bg-slate-900 flex items-center justify-center min-h-screen text-slate-800 dark:text-slate-100 font-noto transition-colors duration-300 antialiased overflow-hidden">
+
+  <!-- 메인 키오스크 컨테이너 -->
+  <div id="kiosk-root" class="mode-fixed-portrait bg-slate-50 dark:bg-slate-950 flex flex-col justify-between relative overflow-hidden transition-all duration-300">
+
+    <!-- [1] 첫 로딩 및 대기 메인 화면 -->
+    <main id="view-home" class="relative w-full h-full flex flex-col justify-between p-8 sm:p-12 z-10 transition-all duration-500 overflow-y-auto">
+      
+      <!-- 커스텀 배경 레이어 -->
+      <div id="bg-cover" class="absolute inset-0 bg-cover bg-center transition-all duration-700 pointer-events-none -z-10"
+           style="background-image: radial-gradient(circle at 50% 30%, rgba(239, 246, 255, 0.95), rgba(226, 232, 240, 0.9));">
+      </div>
+      <div class="absolute inset-0 bg-white/20 dark:bg-black/40 backdrop-blur-[2px] -z-10"></div>
+
+      <!-- 상단 헤더: 타이틀 & 상태 & 관리자 버튼 -->
+      <header class="flex justify-between items-start w-full pt-4 shrink-0">
+        <div class="flex flex-col gap-2">
+          <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-500/10 dark:bg-blue-400/10 text-blue-600 dark:text-blue-400 text-sm font-semibold tracking-wide border border-blue-500/20 w-fit">
+            <span class="w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse"></span>
+            행정 안내 시스템 (클라우드 캐싱 활성)
+          </div>
+          <h1 class="text-3xl sm:text-5xl font-extrabold tracking-tight text-slate-900 dark:text-white drop-shadow-sm leading-tight">
+            순천공업고등학교<br><span class="text-blue-600 dark:text-blue-400">행정실 스마트 키오스크</span>
+          </h1>
+          <p class="text-slate-500 dark:text-slate-400 text-sm sm:text-base font-medium">구글 스프레드시트 및 드라이브와 10분 주기 자동 동기화됩니다.</p>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <!-- 수동 클라우드 동기화 즉시 실행 버튼 -->
+          <button id="btn-manual-sync" class="p-3.5 rounded-2xl glass-panel shadow-md hover:shadow-lg hover:scale-105 active:scale-95 transition-all text-blue-600 dark:text-blue-400" title="구글 드라이브/시트 즉시 동기화">
+            <svg id="sync-icon" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+            </svg>
+          </button>
+          <!-- 관리자 설정 버튼 -->
+          <button id="btn-open-admin-auth" class="p-3.5 rounded-2xl glass-panel shadow-md hover:shadow-lg hover:scale-105 active:scale-95 transition-all text-slate-700 dark:text-slate-200" title="관리자 설정">
+            <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      <!-- 동기화 현황 인포 바 -->
+      <section class="mt-4 mb-2">
+        <div id="sync-status-card" class="px-5 py-3 rounded-2xl bg-blue-50/80 dark:bg-slate-800/80 border border-blue-200/60 dark:border-slate-700 flex items-center justify-between text-xs">
+          <div class="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+            <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+            <span id="sync-status-msg">구글 스프레드시트 연동 준비 완료</span>
+          </div>
+          <span id="sync-last-time" class="font-mono text-slate-400">동기화 이력 없음</span>
+        </div>
+      </section>
+
+      <!-- 중앙: 비디오 & BGM 관리 및 컨트롤 패널 -->
+      <section class="my-auto flex flex-col gap-6 max-w-xl mx-auto w-full">
+        <!-- 동영상 선택 및 제어 박스 -->
+        <div class="glass-panel rounded-3xl p-6 sm:p-8 shadow-xl border border-white/60 dark:border-slate-800">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-xl sm:text-2xl font-bold flex items-center gap-2">
+              <svg class="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+              </svg>
+              키오스크 안내 영상 목록
+            </h2>
+            <span id="video-count-badge" class="text-xs px-2.5 py-1 rounded-full bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 font-bold">0 / 20개</span>
+          </div>
+
+          <!-- 동영상 목록 프리뷰 -->
+          <div id="video-list-container" class="max-h-48 overflow-y-auto space-y-2 mb-5 pr-1">
+            <div id="empty-video-msg" class="text-center py-8 text-slate-400 dark:text-slate-500 text-sm border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl">
+              등록된 동영상이 없습니다.<br>구글 시트에 링크를 입력하거나 로컬 파일을 선택하세요.
+            </div>
+            <ul id="video-list" class="space-y-2 hidden"></ul>
+          </div>
+
+          <!-- 버튼 그룹 -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <label class="cursor-pointer flex items-center justify-center gap-2 px-4 py-3.5 rounded-2xl bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 font-semibold border border-slate-200 dark:border-slate-700 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700 transition active:scale-95 text-center">
+              <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+              </svg>
+              <span>로컬 파일 추가</span>
+              <input type="file" id="video-file-input" accept="video/mp4,video/webm,video/ogg" multiple class="hidden">
+            </label>
+
+            <button id="btn-start-kiosk" disabled class="flex items-center justify-center gap-2 px-4 py-3.5 rounded-2xl bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 dark:disabled:bg-slate-800 text-white font-bold shadow-lg shadow-blue-500/25 disabled:shadow-none transition active:scale-95 cursor-pointer disabled:cursor-not-allowed">
+              <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M8 5v14l11-7z"></path>
+              </svg>
+              <span>키오스크 재생 시작</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 독립 배경음악(BGM) 선택 박스 -->
+        <div class="glass-panel rounded-3xl p-5 shadow-lg border border-white/60 dark:border-slate-800">
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-3">
+              <div class="p-2.5 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12 0c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"></path>
+                </svg>
+              </div>
+              <div>
+                <h3 class="font-bold text-base text-slate-800 dark:text-slate-100">배경음악 (BGM 플레이어)</h3>
+                <p id="bgm-status-text" class="text-xs text-slate-500 dark:text-slate-400">음악 미등록 (최대 100곡)</p>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <label class="cursor-pointer px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 text-xs font-semibold border border-slate-200 dark:border-slate-700 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700 transition flex items-center gap-1.5">
+                <svg class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                <span>음악 추가</span>
+                <input type="file" id="bgm-file-input" accept="audio/*" multiple class="hidden">
+              </label>
+              <button id="btn-toggle-bgm" class="p-2.5 rounded-xl bg-amber-500 text-white shadow-md hover:bg-amber-600 active:scale-95 transition" title="BGM 재생/정지">
+                <svg id="icon-bgm-play" class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                <svg id="icon-bgm-pause" class="w-5 h-5 hidden" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <div id="bgm-list-container" class="max-h-36 overflow-y-auto space-y-1.5 mb-3 pr-1">
+            <div id="empty-bgm-msg" class="text-center py-4 text-slate-400 dark:text-slate-500 text-xs border border-dashed border-slate-200 dark:border-slate-700 rounded-xl">
+              등록된 배경음악이 없습니다.
+            </div>
+            <ul id="bgm-list" class="space-y-1.5 hidden"></ul>
+          </div>
+
+          <!-- BGM 볼륨 슬라이더 -->
+          <div class="pt-2.5 border-t border-slate-200/60 dark:border-slate-700/60 flex items-center gap-3 text-xs text-slate-500">
+            <span>볼륨</span>
+            <input type="range" id="bgm-volume" min="0" max="1" step="0.05" value="0.3" class="w-full accent-amber-500 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer">
+            <span id="bgm-volume-label">30%</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 하단 크레딧 -->
+      <footer class="w-full flex justify-between items-end pb-2 pt-4 shrink-0">
+        <div class="text-xs text-slate-400 dark:text-slate-500 font-mono">
+          Kiosk Cloud v3.0 (GDrive Caching Model A)
+        </div>
+        <div class="text-right">
+          <p class="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400 tracking-wide">
+            제작자 <span class="font-bold text-slate-700 dark:text-slate-200">useoae(teacher U)</span>
+          </p>
+        </div>
+      </footer>
+    </main>
+
+    <!-- [2] 동영상 재생 뷰 (Full-screen Video Loop View) -->
+    <div id="view-player" class="hidden absolute inset-0 w-full h-full bg-black z-20 overflow-hidden">
+      <video id="kiosk-video" class="w-full h-full object-cover pointer-events-none" autoplay muted playsinline></video>
+
+      <!-- 터치/클릭 가로채기 투명 오버레이 -->
+      <div id="player-touch-surface" class="absolute inset-0 w-full h-full z-10 cursor-pointer"></div>
+
+      <!-- 상단 날짜/날씨/시계 오버레이 배너 -->
+      <div id="weather-banner" class="absolute top-8 left-8 z-20 bg-white/35 dark:bg-slate-900/40 backdrop-blur-xl px-10 py-7 rounded-[2.5rem] shadow-2xl flex items-center gap-7 text-slate-800 dark:text-slate-100 border border-white/30 dark:border-white/10 pointer-events-none transition-opacity">
+        <div id="weather-icon-wrap" class="p-5 rounded-3xl bg-white/30 dark:bg-white/10 flex items-center justify-center shrink-0">
+          <svg id="weather-icon" class="w-16 h-16 sm:w-20 sm:h-20 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="5" stroke-width="2" fill="currentColor" fill-opacity="0.3"></circle>
+            <path stroke-linecap="round" stroke-width="2" d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path>
+          </svg>
+        </div>
+        
+        <div class="flex flex-col justify-center gap-1.5 shrink-0">
+          <div id="banner-date" class="text-2xl sm:text-3xl font-extrabold tracking-tight leading-tight">2026. 10. 30 (금)</div>
+          <div class="flex items-center gap-3 text-xl sm:text-2xl font-bold opacity-90 leading-tight">
+            <span id="banner-weather-text">순천공고 행정실</span>
+            <span class="opacity-50">•</span>
+            <span id="banner-temp" class="text-amber-500 font-extrabold">쾌적</span>
+          </div>
+        </div>
+
+        <div class="h-20 w-[2px] bg-slate-400/30 dark:bg-slate-600/40 rounded-full mx-1"></div>
+
+        <div class="flex items-center">
+          <span id="banner-time" class="text-7xl sm:text-8xl md:text-9xl font-black tracking-tighter font-mono leading-none text-blue-600 dark:text-blue-400 drop-shadow-sm">12:59</span>
+        </div>
+      </div>
+
+      <!-- 오른쪽 상단 홈 이동 버튼 -->
+      <div class="absolute top-8 right-8 z-20 flex items-center gap-3">
+        <button id="btn-exit-player" class="p-3 rounded-2xl glass-panel text-white shadow-lg hover:scale-110 active:scale-95 transition" title="초기 화면으로 이동">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- [3] 달력 페이지 -->
+    <div id="view-calendar" class="calendar-container-query hidden absolute inset-0 w-full h-full z-40 flex flex-col justify-between p-4 sm:p-8 md:p-10 transition-all duration-300">
+      <div class="absolute inset-0 bg-slate-50/95 dark:bg-slate-900/95 backdrop-blur-2xl -z-10"></div>
+
+      <!-- 상단 헤더 -->
+      <header class="flex justify-between items-center w-full pb-3 shrink-0 gap-3">
+        <div class="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
+          <div class="flex flex-col items-center gap-1.5 shrink-0">
+            <span class="w-12 h-12 sm:w-16 sm:h-16 rounded-2xl bg-blue-600 text-white shadow-lg flex items-center justify-center">
+              <svg class="w-7 h-7 sm:w-9 sm:h-9" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+              </svg>
+            </span>
+            <div class="w-12 sm:w-16 h-1.5 bg-slate-200 dark:bg-slate-700/80 rounded-full overflow-hidden" title="남은 시간 진행률">
+              <div id="calendar-progress-bar" class="h-full bg-blue-600 rounded-full transition-all duration-100 ease-linear" style="width: 100%;"></div>
+            </div>
+          </div>
+
+          <div class="min-w-0 flex-1 overflow-hidden">
+            <h2 class="responsive-calendar-title font-black text-slate-900 dark:text-white tracking-tight whitespace-nowrap overflow-hidden text-ellipsis">
+              순천공업고등학교 학사달력
+            </h2>
+          </div>
+        </div>
+
+        <button id="btn-close-calendar" class="shrink-0 p-3 sm:p-3.5 rounded-2xl glass-panel text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-800 active:scale-95 transition shadow-sm" title="영상으로 바로 복귀">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </header>
+
+      <!-- 중앙: 초대형 캘린더 본체 -->
+      <section class="flex-1 my-2 w-full flex flex-col overflow-hidden">
+        <div class="flex-1 glass-panel rounded-3xl p-4 sm:p-7 shadow-2xl border border-white/60 dark:border-slate-800 flex flex-col justify-between h-full">
+          <div class="flex justify-between items-center mb-2">
+            <div class="flex items-center gap-2">
+              <h3 id="cal-month-title" class="text-3xl sm:text-5xl font-black text-slate-800 dark:text-slate-100 tracking-tight">2026년 10월</h3>
+            </div>
+            <div class="flex items-center gap-2">
+              <button id="btn-open-schedule-modal" class="px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-sm flex items-center gap-1.5 shadow-md active:scale-95 transition" title="학사 일정 등록">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                <span>일정 등록</span>
+              </button>
+              <button type="button" id="btn-cal-reset-today" class="px-4 py-1.5 sm:px-5 sm:py-2 rounded-2xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 font-black text-xs sm:text-sm tracking-wider border border-blue-500/20 transition active:scale-95" title="이번 달로 돌아오기">TODAY</button>
+            </div>
+          </div>
+
+          <!-- 요일 헤더 -->
+          <div class="grid grid-cols-7 text-center font-black text-base sm:text-2xl text-slate-500 dark:text-slate-400 py-2 border-b-2 border-slate-200/70 dark:border-slate-700/70 mb-2">
+            <span class="text-rose-500">일</span>
+            <span>월</span>
+            <span>화</span>
+            <span>수</span>
+            <span>목</span>
+            <span>금</span>
+            <span class="text-blue-500">토</span>
+          </div>
+
+          <!-- 대형 달력 그리드 -->
+          <div id="cal-days-grid" class="flex-1 gap-1.5 sm:gap-2.5 text-center content-stretch h-full overflow-hidden"></div>
+        </div>
+      </section>
+
+      <!-- 오늘의 명언 섹션 -->
+      <footer class="mt-3 w-full shrink-0">
+        <div class="glass-panel rounded-3xl p-4 sm:p-6 shadow-xl border border-white/60 dark:border-slate-800/80 flex items-start sm:items-center gap-4 transition-all">
+          <div class="p-3 sm:p-3.5 rounded-2xl bg-blue-500/15 text-blue-600 dark:text-blue-400 shrink-0">
+            <svg class="w-6 h-6 sm:w-8 sm:h-8" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10h-9.983zm-14.017 0v-7.391c0-5.704 3.748-9.57 9-10.609l.996 2.151c-2.433.917-3.996 3.638-3.996 5.849h3.983v10h-9.983z"/>
+            </svg>
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="text-[11px] sm:text-xs font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-400">Today's Quote • 오늘의 명언</span>
+              <span id="quote-author" class="text-xs sm:text-sm font-semibold text-slate-500 dark:text-slate-400 truncate"></span>
+            </div>
+            <p id="quote-kr" class="text-base sm:text-xl font-bold text-slate-800 dark:text-slate-100 leading-snug tracking-tight mb-1">
+              "배움에는 끝이 없으며, 배움을 멈추는 순간 성장이 멈춘다."
+            </p>
+            <p id="quote-en" class="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400 italic line-clamp-2">
+              "Live as if you were to die tomorrow. Learn as if you were to live forever."
+            </p>
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <!-- [4] 관리자 비밀번호 확인 모달 -->
+    <div id="modal-auth" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      <div class="glass-panel bg-white/90 dark:bg-slate-900/90 rounded-3xl p-6 sm:p-8 max-w-sm w-full shadow-2xl border border-white/40 dark:border-slate-700 fade-enter">
+        <h3 class="text-xl font-bold text-slate-900 dark:text-white mb-2">관리자 인증</h3>
+        <p class="text-xs text-slate-500 dark:text-slate-400 mb-5">관리자 설정을 위해 비밀번호를 입력해주세요.</p>
+        
+        <form id="auth-form" class="space-y-4">
+          <div>
+            <input type="password" id="input-admin-pw" placeholder="비밀번호 입력" class="w-full px-4 py-3 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 text-center font-mono tracking-widest text-lg" autofocus autocomplete="off">
+            <p id="auth-error-msg" class="hidden text-rose-500 text-xs mt-2 text-center font-semibold">비밀번호가 일치하지 않습니다.</p>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <button type="button" id="btn-cancel-auth" class="px-4 py-2.5 rounded-xl bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold text-sm hover:bg-slate-300 transition">취소</button>
+            <button type="submit" class="px-4 py-2.5 rounded-xl bg-blue-600 text-white font-semibold text-sm hover:bg-blue-700 transition">확인</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- [5] 관리자 설정 모달 패널 (구글 시트 연동 탭 추가) -->
+    <div id="modal-settings" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
+      <div class="glass-panel bg-white/95 dark:bg-slate-900/95 rounded-3xl p-6 sm:p-8 max-w-xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-white/40 dark:border-slate-700 fade-enter">
+        <div class="flex justify-between items-center pb-4 border-b border-slate-200 dark:border-slate-800 mb-6">
+          <h3 class="text-2xl font-black text-slate-900 dark:text-white">키오스크 시스템 설정</h3>
+          <button id="btn-close-settings" class="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 transition">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+          </button>
+        </div>
+
+        <div class="space-y-6">
+          <!-- [추천 모델 A] 구글 스프레드시트 클라우드 연동 섹션 -->
+          <div class="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50/70 dark:from-slate-800/90 dark:to-blue-950/40 border border-blue-200 dark:border-blue-900/80 space-y-4">
+            <div class="flex items-center justify-between">
+              <h4 class="font-bold text-sm text-blue-900 dark:text-blue-300 flex items-center gap-2">
+                <svg class="w-5 h-5 text-emerald-600 dark:text-emerald-400" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
+                </svg>
+                구글 스프레드시트 + 드라이브 연동
+              </h4>
+              <span class="text-[11px] px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 font-semibold">10분 자동 캐싱</span>
+            </div>
+            
+            <p class="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+              구글 시트의 [파일 ➔ 공유 ➔ 웹에 게시]에서 <strong>CSV 형식</strong> 링크를 입력하세요.<br>
+              시트에는 파일명, 구글 드라이브 공유 링크(view?usp=sharing), 일정 등을 작성합니다.
+            </p>
+
+            <div class="space-y-3">
+              <div>
+                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">동영상 시트 CSV URL (또는 Google Sheet ID)</label>
+                <input type="text" id="cfg-sheet-videos" placeholder="https://docs.google.com/spreadsheets/d/.../pub?output=csv" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-mono">
+              </div>
+
+              <div>
+                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">배경음악(BGM) 시트 CSV URL (선택 사항)</label>
+                <input type="text" id="cfg-sheet-audios" placeholder="https://docs.google.com/spreadsheets/d/.../pub?gid=...&output=csv" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-mono">
+              </div>
+
+              <div>
+                <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">학사일정 시트 CSV URL (선택 사항)</label>
+                <input type="text" id="cfg-sheet-schedules" placeholder="https://docs.google.com/spreadsheets/d/.../pub?gid=...&output=csv" class="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-mono">
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between pt-2">
+              <span class="text-[11px] text-slate-500">CORS 방지 프록시 및 다이렉트 변환 자동 지원</span>
+              <button type="button" id="btn-modal-test-sync" class="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow transition">
+                지금 시트 연결 테스트
+              </button>
+            </div>
+          </div>
+
+          <!-- 화면 디스플레이 모드 -->
+          <div class="space-y-2">
+            <label class="text-sm font-bold text-slate-700 dark:text-slate-300">화면 디스플레이 모드</label>
+            <div class="grid grid-cols-2 gap-3">
+              <button type="button" id="btn-mode-portrait" class="p-3 rounded-2xl border border-blue-500 bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 font-bold text-xs sm:text-sm text-center transition">
+                📱 세로 고정 모드<br><span class="text-[11px] font-normal opacity-80">(1080×1920 세로 고정)</span>
+              </button>
+              <button type="button" id="btn-mode-responsive" class="p-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-xs sm:text-sm text-center transition">
+                🖥️ 스크린 맞춤 모드<br><span class="text-[11px] font-normal opacity-80">(디스플레이 가득 채움)</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- 달력 화면 노출 시간 개별 설정 -->
+          <div class="p-4 rounded-2xl bg-slate-100/70 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-4">
+            <h4 class="font-bold text-sm text-slate-800 dark:text-slate-200 flex items-center gap-2">
+              <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+              달력 노출 시간 설정
+            </h4>
+            
+            <div>
+              <div class="flex justify-between text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                <span>동영상 화면 클릭(터치) 시</span>
+                <span id="click-duration-val" class="text-blue-600 dark:text-blue-400 font-bold font-mono">10초</span>
+              </div>
+              <input type="range" id="input-click-duration" min="3" max="60" step="1" value="10" class="w-full accent-blue-600 h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer">
+            </div>
+
+            <div>
+              <div class="flex justify-between text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                <span>전체 동영상 재생 사이클 완료 시</span>
+                <span id="cycle-duration-val" class="text-blue-600 dark:text-blue-400 font-bold font-mono">20초</span>
+              </div>
+              <input type="range" id="input-cycle-duration" min="5" max="120" step="1" value="20" class="w-full accent-blue-600 h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer">
+            </div>
+          </div>
+
+          <!-- 테마 모드 변경 -->
+          <div class="space-y-2">
+            <label class="text-sm font-bold text-slate-700 dark:text-slate-300">화면 테마 모드</label>
+            <div class="grid grid-cols-2 gap-3">
+              <button type="button" id="btn-theme-light" class="p-3 rounded-2xl border border-slate-200 dark:border-slate-700 flex items-center justify-center gap-2 font-bold text-sm bg-white text-slate-800 shadow-sm">
+                <svg class="w-5 h-5 text-amber-500" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z"/></svg>
+                화이트 모드 (기본)
+              </button>
+              <button type="button" id="btn-theme-dark" class="p-3 rounded-2xl border border-slate-200 dark:border-slate-700 flex items-center justify-center gap-2 font-bold text-sm bg-slate-800 text-slate-100 shadow-sm">
+                <svg class="w-5 h-5 text-indigo-400" fill="currentColor" viewBox="0 0 20 20"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"/></svg>
+                다크 모드
+              </button>
+            </div>
+          </div>
+
+          <!-- 전체 폰트 변경 -->
+          <div class="space-y-2">
+            <label class="text-sm font-bold text-slate-700 dark:text-slate-300">전체 웹앱 글꼴 (폰트)</label>
+            <select id="select-font" class="w-full p-3 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 text-sm font-medium focus:ring-2 focus:ring-blue-500">
+              <option value="font-noto">Noto Sans KR (기본 고딕)</option>
+              <option value="font-nanum">Nanum Gothic (나눔고딕)</option>
+              <option value="font-gowun">Gowun Dodum (고운돋움 - 부드러운 서체)</option>
+              <option value="font-system">System Default (시스템 기본 폰트)</option>
+            </select>
+          </div>
+
+          <!-- 부팅 시 자동 실행 -->
+          <div class="p-4 rounded-2xl bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/60 space-y-3">
+            <div class="flex items-center justify-between">
+              <div>
+                <h4 class="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-1.5">
+                  <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                  부팅 시 마지막 캐시 자동 실행
+                </h4>
+                <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">인터넷 유무와 무관하게 IndexedDB에 저장된 영상으로 자동 시작합니다.</p>
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="toggle-auto-boot" class="sr-only peer" checked>
+                <div class="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+              </label>
+            </div>
+          </div>
+
+          <!-- 설정 완료 버튼 -->
+          <div class="pt-4 border-t border-slate-200 dark:border-slate-800 flex justify-between items-center">
+            <div class="text-xs text-slate-400">
+              설정값은 브라우저 로컬 스토리지에 보관됩니다.
+            </div>
+            <button id="btn-save-settings" class="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm shadow-md transition">
+              완료 및 저장
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- [6] 학사 일정 등록 및 관리 모달 -->
+    <div id="modal-schedule" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
+      <div class="glass-panel bg-white/95 dark:bg-slate-900/95 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl border border-white/40 dark:border-slate-700 fade-enter">
+        <div class="flex justify-between items-center pb-3 border-b border-slate-200 dark:border-slate-800 mb-4">
+          <div class="flex items-center gap-2">
+            <span class="p-2 rounded-xl bg-blue-600 text-white">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+            </span>
+            <h3 class="text-xl font-bold text-slate-900 dark:text-white">학사 일정 등록</h3>
+          </div>
+          <button id="btn-close-schedule-modal" class="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 transition">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+          </button>
+        </div>
+
+        <form id="schedule-form" class="space-y-4">
+          <div>
+            <label class="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">날짜 선택</label>
+            <input type="date" id="schedule-input-date" required class="w-full px-3.5 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500">
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">시간 (선택 사항)</label>
+            <input type="time" id="schedule-input-time" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500">
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">일정 내용</label>
+            <input type="text" id="schedule-input-title" required placeholder="예: 2학기 중간고사, 개교기념일" maxlength="30" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500">
+          </div>
+
+          <div id="schedule-existing-container" class="hidden pt-2 border-t border-slate-200 dark:border-slate-800">
+            <span class="text-xs font-bold text-slate-500 dark:text-slate-400 block mb-2">선택 날짜의 등록된 일정</span>
+            <div id="schedule-existing-list" class="space-y-1.5 max-h-32 overflow-y-auto pr-1"></div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2 pt-2">
+            <button type="button" id="btn-cancel-schedule" class="px-4 py-2.5 rounded-xl bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold text-sm hover:bg-slate-300 dark:hover:bg-slate-700 transition">취소</button>
+            <button type="submit" class="px-4 py-2.5 rounded-xl bg-blue-600 text-white font-semibold text-sm hover:bg-blue-700 transition">일정 등록</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 독립 백그라운드 오디오 엘리먼트 -->
+  <audio id="bgm-audio" preload="auto"></audio>
+
+  <!-- 프론트엔드 비즈니스 로직 스크립트 -->
+  <script>
+    // -------------------------------------------------------------
+    // Web Audio API 전역 오디오 그래프 (하드웨어 오디오 버퍼링)
+    // -------------------------------------------------------------
+    let audioCtx = null;
+    let audioSourceNode = null;
+    let audioGainNode = null;
+
+    function initWebAudioGraph() {
+      try {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) return;
+        if (!audioCtx) {
+          audioCtx = new AudioContextClass({ latencyHint: 'playback' });
+        }
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume();
+        }
+        if (!audioSourceNode && bgmAudio) {
+          audioSourceNode = audioCtx.createMediaElementSource(bgmAudio);
+          audioGainNode = audioCtx.createGain();
+          audioGainNode.gain.value = 1.0;
+          audioSourceNode.connect(audioGainNode);
+          audioGainNode.connect(audioCtx.destination);
+        }
+      } catch (e) {
+        console.warn('Web Audio Context 초기화 우회:', e);
+      }
+    }
+
+    // -------------------------------------------------------------
+    // 0. IndexedDB 대용량 미디어 영구 캐싱 저장소 (모델 A 핵심)
+    // -------------------------------------------------------------
+    const DB_NAME = 'SuncheonKioskMediaDB_v3';
+    const DB_VERSION = 2;
+    const STORE_VIDEOS = 'videos';
+    const STORE_AUDIOS = 'audios';
+
+    function openMediaDB() {
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open(DB_NAME, DB_VERSION);
+        req.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains(STORE_VIDEOS)) {
+            db.createObjectStore(STORE_VIDEOS, { keyPath: 'id' });
+          }
+          if (!db.objectStoreNames.contains(STORE_AUDIOS)) {
+            db.createObjectStore(STORE_AUDIOS, { keyPath: 'id' });
+          }
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+    }
+
+    async function dbSaveAllVideos(videoList) {
+      try {
+        const db = await openMediaDB();
+        const tx = db.transaction(STORE_VIDEOS, 'readwrite');
+        const store = tx.objectStore(STORE_VIDEOS);
+        store.clear();
+        videoList.forEach((v, idx) => {
+          if (v.blob) {
+            store.put({
+              id: v.id || ('vid_' + idx + '_' + v.name),
+              order: idx,
+              name: v.name,
+              size: v.size,
+              type: v.type || 'video/mp4',
+              blob: v.blob,
+              sourceUrl: v.sourceUrl || ''
+            });
+          }
+        });
+        return new Promise((res, rej) => {
+          tx.oncomplete = () => res();
+          tx.onerror = () => rej(tx.error);
+        });
+      } catch (err) {
+        console.warn('비디오 IndexedDB 저장 실패:', err);
+      }
+    }
+
+    async function dbLoadAllVideos() {
+      try {
+        const db = await openMediaDB();
+        const tx = db.transaction(STORE_VIDEOS, 'readonly');
+        const store = tx.objectStore(STORE_VIDEOS);
+        const req = store.getAll();
+        return new Promise((res) => {
+          req.onsuccess = () => {
+            const list = req.result || [];
+            list.sort((a, b) => a.order - b.order);
+            res(list);
+          };
+          req.onerror = () => res([]);
+        });
+      } catch (err) {
+        console.warn('비디오 IndexedDB 불러오기 실패:', err);
+        return [];
+      }
+    }
+
+    async function dbSaveAllAudios(audioList) {
+      try {
+        const db = await openMediaDB();
+        const tx = db.transaction(STORE_AUDIOS, 'readwrite');
+        const store = tx.objectStore(STORE_AUDIOS);
+        store.clear();
+        audioList.forEach((a, idx) => {
+          if (a.blob) {
+            store.put({
+              id: a.id || ('aud_' + idx + '_' + a.name),
+              order: idx,
+              name: a.name,
+              size: a.size,
+              type: a.type || 'audio/mpeg',
+              blob: a.blob,
+              sourceUrl: a.sourceUrl || ''
+            });
+          }
+        });
+        return new Promise((res, rej) => {
+          tx.oncomplete = () => res();
+          tx.onerror = () => rej(tx.error);
+        });
+      } catch (err) {
+        console.warn('BGM IndexedDB 저장 실패:', err);
+      }
+    }
+
+    async function dbLoadAllAudios() {
+      try {
+        const db = await openMediaDB();
+        const tx = db.transaction(STORE_AUDIOS, 'readonly');
+        const store = tx.objectStore(STORE_AUDIOS);
+        const req = store.getAll();
+        return new Promise((res) => {
+          req.onsuccess = () => {
+            const list = req.result || [];
+            list.sort((a, b) => a.order - b.order);
+            res(list);
+          };
+          req.onerror = () => res([]);
+        });
+      } catch (err) {
+        console.warn('BGM IndexedDB 불러오기 실패:', err);
+        return [];
+      }
+    }
+
+    // -------------------------------------------------------------
+    // 1. 상태 관리 객체 (State Management)
+    // -------------------------------------------------------------
+    const SETTINGS_STORAGE_KEY = 'kiosk_persistent_config_v3';
+
+    const state = {
+      videos: [],            // [{ id, name, size, type, blob, url, sourceUrl }]
+      currentVideoIdx: 0,
+      bgmList: [],           // [{ id, name, size, type, blob, url, sourceUrl }]
+      currentBgmIdx: 0,
+      isBgmPlaying: false,
+      calendarTimeout: null,
+      calendarInterval: null,
+      calendarDate: new Date(),
+      theme: 'light',
+      font: 'font-noto',
+      customBg: null,
+      displayMode: 'portrait',
+      clickCalendarDuration: 10,
+      cycleCalendarDuration: 20,
+      autoBootRestore: true,
+      schedules: [],
+      // 구글 스프레드시트 연동 설정
+      sheetVideosUrl: '',
+      sheetAudiosUrl: '',
+      sheetSchedulesUrl: '',
+      lastSyncTime: null,
+      isSyncing: false
+    };
+
+    // DOM 캐싱
+    const kioskRoot = document.getElementById('kiosk-root');
+    const viewHome = document.getElementById('view-home');
+    const viewPlayer = document.getElementById('view-player');
+    const viewCalendar = document.getElementById('view-calendar');
+    const kioskVideo = document.getElementById('kiosk-video');
+    const bgCover = document.getElementById('bg-cover');
+    const bgmAudio = document.getElementById('bgm-audio');
+
+    const btnOpenAdminAuth = document.getElementById('btn-open-admin-auth');
+    const modalAuth = document.getElementById('modal-auth');
+    const authForm = document.getElementById('auth-form');
+    const inputAdminPw = document.getElementById('input-admin-pw');
+    const authErrorMsg = document.getElementById('auth-error-msg');
+    const btnCancelAuth = document.getElementById('btn-cancel-auth');
+
+    const modalSettings = document.getElementById('modal-settings');
+    const btnCloseSettings = document.getElementById('btn-close-settings');
+    const btnSaveSettings = document.getElementById('btn-save-settings');
+
+    const btnModePortrait = document.getElementById('btn-mode-portrait');
+    const btnModeResponsive = document.getElementById('btn-mode-responsive');
+    const inputClickDuration = document.getElementById('input-click-duration');
+    const clickDurationVal = document.getElementById('click-duration-val');
+    const inputCycleDuration = document.getElementById('input-cycle-duration');
+    const cycleDurationVal = document.getElementById('cycle-duration-val');
+
+    const btnThemeLight = document.getElementById('btn-theme-light');
+    const btnThemeDark = document.getElementById('btn-theme-dark');
+    const selectFont = document.getElementById('select-font');
+    const toggleAutoBoot = document.getElementById('toggle-auto-boot');
+
+    const cfgSheetVideos = document.getElementById('cfg-sheet-videos');
+    const cfgSheetAudios = document.getElementById('cfg-sheet-audios');
+    const cfgSheetSchedules = document.getElementById('cfg-sheet-schedules');
+    const btnModalTestSync = document.getElementById('btn-modal-test-sync');
+    const btnManualSync = document.getElementById('btn-manual-sync');
+    const syncStatusMsg = document.getElementById('sync-status-msg');
+    const syncLastTime = document.getElementById('sync-last-time');
+    const syncIcon = document.getElementById('sync-icon');
+
+    // -------------------------------------------------------------
+    // 2. 구글 드라이브 URL 변환 유틸리티
+    // -------------------------------------------------------------
+    function extractGoogleDriveFileId(rawUrl) {
+      if (!rawUrl) return null;
+      rawUrl = rawUrl.trim();
+      if (/^[a-zA-Z0-9_-]{25,}$/.test(rawUrl)) {
+        return rawUrl;
+      }
+      const match = rawUrl.match(/\/d\/([a-zA-Z0-9_-]+)/) ||
+                    rawUrl.match(/id=([a-zA-Z0-9_-]+)/) ||
+                    rawUrl.match(/file\/d\/([a-zA-Z0-9_-]+)/);
+      return match ? match[1] : null;
+    }
+
+    function buildGoogleDriveDirectDownloadUrls(fileId) {
+      // 1순위: 직접 uc 다운로드 링크
+      // 2순위: CORS 우회 프록시
+      return [
+        `https://drive.google.com/uc?export=download&id=${fileId}`,
+        `https://docs.google.com/uc?export=download&id=${fileId}`,
+        `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://drive.google.com/uc?export=download&id=${fileId}`)}`
+      ];
+    }
+
+    // CSV 파서 (따옴표 및 줄바꿈 지원)
+    function parseCSV(text) {
+      const lines = [];
+      let row = [];
+      let inQuotes = false;
+      let token = '';
+
+      for (let i = 0; i < text.length; i++) {
+        const char = text[i];
+        const nextChar = text[i + 1];
+
+        if (char === '"') {
+          if (inQuotes && nextChar === '"') {
+            token += '"';
+            i++;
+          } else {
+            inQuotes = !inQuotes;
+          }
+        } else if (char === ',' && !inQuotes) {
+          row.push(token.trim());
+          token = '';
+        } else if ((char === '\r' || char === '\n') && !inQuotes) {
+          if (char === '\r' && nextChar === '\n') i++;
+          row.push(token.trim());
+          if (row.length > 0 && row.some(cell => cell.length > 0)) {
+            lines.push(row);
+          }
+          row = [];
+          token = '';
+        } else {
+          token += char;
+        }
+      }
+      if (token.length > 0 || row.length > 0) {
+        row.push(token.trim());
+        lines.push(row);
+      }
+      return lines;
+    }
+
+    // -------------------------------------------------------------
+    // 3. 구글 스프레드시트 & 구글 드라이브 백그라운드 캐싱 엔진
+    // -------------------------------------------------------------
+    async function syncCloudSpreadsheet(isUserTriggered = false) {
+      if (state.isSyncing) return;
+      state.isSyncing = true;
+      if (syncIcon) syncIcon.classList.add('animate-spin');
+      if (syncStatusMsg) syncStatusMsg.textContent = '구글 시트 및 드라이브 최신 데이터 확인 중...';
+
+      let updateCount = 0;
+
+      try {
+        // [A] 동영상 동기화
+        if (state.sheetVideosUrl) {
+          const vidUrl = state.sheetVideosUrl.trim();
+          const targetUrl = vidUrl.includes('output=csv') ? vidUrl : (vidUrl.includes('docs.google.com') ? vidUrl.replace(/\/edit.*$/, '/pub?output=csv') : vidUrl);
+          const res = await fetch(targetUrl);
+          if (res.ok) {
+            const csvText = await res.text();
+            const rows = parseCSV(csvText);
+            // 헤더 감지: 파일명, 링크 (열 순서 유동 지원)
+            if (rows.length > 1) {
+              const dataRows = rows.slice(1);
+              const newVideos = [];
+
+              for (const r of dataRows) {
+                if (r.length < 2) continue;
+                const name = r[0] || '영상';
+                const link = r[1] || '';
+                const fileId = extractGoogleDriveFileId(link);
+                if (!fileId && !link.startsWith('http')) continue;
+
+                // 기존 IndexedDB/State에 동일 파일이 캐싱되어 있는지 확인
+                const existing = state.videos.find(v => v.sourceUrl === link || (fileId && v.fileId === fileId));
+                if (existing && existing.blob) {
+                  newVideos.push(existing);
+                } else {
+                  // 신규 파일 다운로드
+                  if (syncStatusMsg) syncStatusMsg.textContent = `동영상 캐싱 다운로드 중: ${name}`;
+                  const blob = await fetchMediaBlob(link, fileId, 'video/mp4');
+                  if (blob) {
+                    newVideos.push({
+                      id: 'gdrive_vid_' + fileId,
+                      fileId: fileId,
+                      name: name,
+                      size: blob.size,
+                      type: blob.type || 'video/mp4',
+                      blob: blob,
+                      url: URL.createObjectURL(blob),
+                      sourceUrl: link
+                    });
+                    updateCount++;
+                  }
+                }
+                if (newVideos.length >= 20) break; // 최대 20개 제한
+              }
+
+              if (newVideos.length > 0) {
+                state.videos = newVideos;
+                await dbSaveAllVideos(state.videos);
+                renderVideoList();
+              }
+            }
+          }
+        }
+
+        // [B] 배경음악(BGM) 동기화
+        if (state.sheetAudiosUrl) {
+          const audUrl = state.sheetAudiosUrl.trim();
+          const targetUrl = audUrl.includes('output=csv') ? audUrl : (audUrl.includes('docs.google.com') ? audUrl.replace(/\/edit.*$/, '/pub?output=csv') : audUrl);
+          const res = await fetch(targetUrl);
+          if (res.ok) {
+            const csvText = await res.text();
+            const rows = parseCSV(csvText);
+            if (rows.length > 1) {
+              const dataRows = rows.slice(1);
+              const newAudios = [];
+
+              for (const r of dataRows) {
+                if (r.length < 2) continue;
+                const name = r[0] || '음악';
+                const link = r[1] || '';
+                const fileId = extractGoogleDriveFileId(link);
+                if (!fileId && !link.startsWith('http')) continue;
+
+                const existing = state.bgmList.find(a => a.sourceUrl === link || (fileId && a.fileId === fileId));
+                if (existing && existing.blob) {
+                  newAudios.push(existing);
+                } else {
+                  if (syncStatusMsg) syncStatusMsg.textContent = `BGM 캐싱 다운로드 중: ${name}`;
+                  const blob = await fetchMediaBlob(link, fileId, 'audio/mpeg');
+                  if (blob) {
+                    newAudios.push({
+                      id: 'gdrive_aud_' + fileId,
+                      fileId: fileId,
+                      name: name,
+                      size: blob.size,
+                      type: blob.type || 'audio/mpeg',
+                      blob: blob,
+                      url: URL.createObjectURL(blob),
+                      sourceUrl: link
+                    });
+                    updateCount++;
+                  }
+                }
+                if (newAudios.length >= 100) break;
+              }
+
+              if (newAudios.length > 0) {
+                state.bgmList = newAudios;
+                await dbSaveAllAudios(state.bgmList);
+                renderBgmList();
+              }
+            }
+          }
+        }
+
+        // [C] 학사 일정 동기화
+        if (state.sheetSchedulesUrl) {
+          const schUrl = state.sheetSchedulesUrl.trim();
+          const targetUrl = schUrl.includes('output=csv') ? schUrl : (schUrl.includes('docs.google.com') ? schUrl.replace(/\/edit.*$/, '/pub?output=csv') : schUrl);
+          const res = await fetch(targetUrl);
+          if (res.ok) {
+            const csvText = await res.text();
+            const rows = parseCSV(csvText);
+            if (rows.length > 1) {
+              const dataRows = rows.slice(1);
+              const newSchedules = [];
+
+              dataRows.forEach((r, idx) => {
+                if (r.length < 2) return;
+                const date = (r[0] || '').trim(); // YYYY-MM-DD
+                const title = (r[1] || '').trim();
+                const time = (r[2] || '').trim();
+
+                if (date && title) {
+                  newSchedules.push({
+                    id: 'gdrive_sch_' + idx + '_' + date,
+                    date: date,
+                    time: time,
+                    title: title
+                  });
+                }
+              });
+
+              if (newSchedules.length > 0) {
+                state.schedules = newSchedules;
+                state.schedules.sort((a, b) => (a.date + ' ' + (a.time || '')).localeCompare(b.date + ' ' + (b.time || '')));
+                renderCalendar();
+              }
+            }
+          }
+        }
+
+        state.lastSyncTime = new Date().toISOString();
+        savePersistentConfig();
+        updateSyncUI();
+        if (isUserTriggered) {
+          showFloatingToast('구글 클라우드 동기화가 완료되었습니다.');
+        }
+      } catch (err) {
+        console.warn('구글 클라우드 동기화 중 오류 (기존 IndexedDB 캐시로 계속 동작):', err);
+        if (syncStatusMsg) syncStatusMsg.textContent = '오프라인 캐시 모드 가동 중 (인터넷 미연결 또는 CORS 차단)';
+        if (isUserTriggered) {
+          showFloatingToast('동기화 실패: 네트워크 상태 또는 구글 시트 게시 URL을 확인하세요.');
+        }
+      } finally {
+        state.isSyncing = false;
+        if (syncIcon) syncIcon.classList.remove('animate-spin');
+      }
+    }
+
+    // 구글 드라이브 파일 안전 Blob 다운로드
+    async function fetchMediaBlob(rawUrl, fileId, fallbackMime) {
+      const candidates = fileId ? buildGoogleDriveDirectDownloadUrls(fileId) : [rawUrl];
+      for (const url of candidates) {
+        try {
+          const res = await fetch(url, { mode: 'cors' });
+          if (res.ok) {
+            const blob = await res.blob();
+            if (blob && blob.size > 1024) { // 1KB 이상 정상 미디어
+              return blob;
+            }
+          }
+        } catch (e) {
+          // 다음 후보 URL 시도
+        }
+      }
+      return null;
+    }
+
+    function updateSyncUI() {
+      if (state.lastSyncTime) {
+        const d = new Date(state.lastSyncTime);
+        const timeStr = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`;
+        if (syncLastTime) syncLastTime.textContent = `최근 동기화: ${timeStr}`;
+        if (syncStatusMsg) syncStatusMsg.textContent = `클라우드 동기화 완료 (동영상 ${state.videos.length}개, BGM ${state.bgmList.length}개, 일정 ${state.schedules.length}개)`;
+      }
+    }
+
+    // -------------------------------------------------------------
+    // 4. 로컬 스토리지 설정 동기화
+    // -------------------------------------------------------------
+    function savePersistentConfig() {
+      const configPayload = {
+        theme: state.theme,
+        font: state.font,
+        displayMode: state.displayMode,
+        clickCalendarDuration: state.clickCalendarDuration,
+        cycleCalendarDuration: state.cycleCalendarDuration,
+        autoBootRestore: state.autoBootRestore,
+        customBg: state.customBg,
+        schedules: state.schedules,
+        sheetVideosUrl: state.sheetVideosUrl,
+        sheetAudiosUrl: state.sheetAudiosUrl,
+        sheetSchedulesUrl: state.sheetSchedulesUrl,
+        lastSyncTime: state.lastSyncTime
+      };
+      try {
+        localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(configPayload));
+      } catch (err) {
+        console.warn('설정 저장 실패:', err);
+      }
+    }
+
+    function loadSavedSettings() {
+      try {
+        const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
+        if (raw) {
+          const config = JSON.parse(raw);
+          state.theme = config.theme || 'light';
+          state.font = config.font || 'font-noto';
+          state.displayMode = config.displayMode || 'portrait';
+          state.clickCalendarDuration = config.clickCalendarDuration || 10;
+          state.cycleCalendarDuration = config.cycleCalendarDuration || 20;
+          state.autoBootRestore = config.autoBootRestore !== undefined ? config.autoBootRestore : true;
+          state.customBg = config.customBg || null;
+          state.schedules = Array.isArray(config.schedules) ? config.schedules : [];
+          state.sheetVideosUrl = config.sheetVideosUrl || '';
+          state.sheetAudiosUrl = config.sheetAudiosUrl || '';
+          state.sheetSchedulesUrl = config.sheetSchedulesUrl || '';
+          state.lastSyncTime = config.lastSyncTime || null;
+
+          applyTheme(state.theme, false);
+          applyFont(state.font, false);
+          applyDisplayMode(state.displayMode, false);
+
+          inputClickDuration.value = state.clickCalendarDuration;
+          clickDurationVal.textContent = `${state.clickCalendarDuration}초`;
+          inputCycleDuration.value = state.cycleCalendarDuration;
+          cycleDurationVal.textContent = `${state.cycleCalendarDuration}초`;
+
+          if (cfgSheetVideos) cfgSheetVideos.value = state.sheetVideosUrl;
+          if (cfgSheetAudios) cfgSheetAudios.value = state.sheetAudiosUrl;
+          if (cfgSheetSchedules) cfgSheetSchedules.value = state.sheetSchedulesUrl;
+          if (toggleAutoBoot) toggleAutoBoot.checked = state.autoBootRestore;
+
+          updateSyncUI();
+        }
+      } catch (e) {
+        console.error('설정 로드 실패:', e);
+      }
+    }
+
+    function applyDisplayMode(mode, save = true) {
+      state.displayMode = mode;
+      if (mode === 'portrait') {
+        kioskRoot.className = 'mode-fixed-portrait bg-slate-50 dark:bg-slate-950 flex flex-col justify-between relative overflow-hidden transition-all duration-300';
+        btnModePortrait.className = 'p-3 rounded-2xl border-2 border-blue-500 bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 font-bold text-xs sm:text-sm text-center shadow-sm';
+        btnModeResponsive.className = 'p-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-xs sm:text-sm text-center';
+      } else {
+        kioskRoot.className = 'mode-responsive bg-slate-50 dark:bg-slate-950 flex flex-col justify-between relative overflow-hidden transition-all duration-300';
+        btnModeResponsive.className = 'p-3 rounded-2xl border-2 border-blue-500 bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 font-bold text-xs sm:text-sm text-center shadow-sm';
+        btnModePortrait.className = 'p-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-xs sm:text-sm text-center';
+      }
+      if (save) savePersistentConfig();
+    }
+
+    function applyTheme(theme, save = true) {
+      state.theme = theme;
+      if (theme === 'dark') {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+      if (save) savePersistentConfig();
+    }
+
+    function applyFont(fontClass, save = true) {
+      document.body.classList.remove('font-noto', 'font-nanum', 'font-gowun', 'font-system');
+      document.body.classList.add(fontClass);
+      state.font = fontClass;
+      selectFont.value = fontClass;
+      if (save) savePersistentConfig();
+    }
+
+    // -------------------------------------------------------------
+    // 5. 비디오 & BGM 관리 및 로컬 렌더링
+    // -------------------------------------------------------------
+    const videoFileInput = document.getElementById('video-file-input');
+    const videoListEl = document.getElementById('video-list');
+    const emptyVideoMsg = document.getElementById('empty-video-msg');
+    const videoCountBadge = document.getElementById('video-count-badge');
+    const btnStartKiosk = document.getElementById('btn-start-kiosk');
+
+    const bgmFileInput = document.getElementById('bgm-file-input');
+    const bgmListEl = document.getElementById('bgm-list');
+    const emptyBgmMsg = document.getElementById('empty-bgm-msg');
+    const btnToggleBgm = document.getElementById('btn-toggle-bgm');
+    const iconBgmPlay = document.getElementById('icon-bgm-play');
+    const iconBgmPause = document.getElementById('icon-bgm-pause');
+    const bgmStatusText = document.getElementById('bgm-status-text');
+    const bgmVolume = document.getElementById('bgm-volume');
+    const bgmVolumeLabel = document.getElementById('bgm-volume-label');
+
+    function formatFileSize(bytes) {
+      if (!bytes || bytes === 0) return '0 B';
+      const k = 1024;
+      const sizes = ['B', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    }
+
+    function renderVideoList() {
+      videoListEl.innerHTML = '';
+      videoCountBadge.textContent = `${state.videos.length} / 20개`;
+
+      if (state.videos.length === 0) {
+        emptyVideoMsg.classList.remove('hidden');
+        videoListEl.classList.add('hidden');
+        btnStartKiosk.disabled = true;
+      } else {
+        emptyVideoMsg.classList.add('hidden');
+        videoListEl.classList.remove('hidden');
+        btnStartKiosk.disabled = false;
+
+        state.videos.forEach((vid, index) => {
+          const li = document.createElement('li');
+          li.className = 'flex items-center justify-between p-2.5 rounded-xl bg-white/70 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700 text-xs sm:text-sm font-medium shadow-sm';
+          li.innerHTML = `
+            <div class="flex items-center gap-2.5 truncate pr-2">
+              <span class="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300 flex items-center justify-center font-bold text-xs shrink-0">${index + 1}</span>
+              <span class="truncate text-slate-800 dark:text-slate-100 font-semibold">${vid.name}</span>
+              <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-200/80 dark:bg-slate-700 text-slate-500 dark:text-slate-400 font-mono shrink-0">${formatFileSize(vid.size)}</span>
+              ${vid.sourceUrl ? '<span class="text-[9px] px-1 rounded bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300">구글클라우드</span>' : ''}
+            </div>
+            <button onclick="removeVideo(${index})" class="text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/50 p-1.5 rounded-lg transition" title="삭제">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+            </button>
+          `;
+          videoListEl.appendChild(li);
+        });
+      }
+    }
+
+    window.removeVideo = function(index) {
+      if (state.videos[index]) {
+        if (state.videos[index].url) URL.revokeObjectURL(state.videos[index].url);
+        state.videos.splice(index, 1);
+        renderVideoList();
+        dbSaveAllVideos(state.videos);
+        savePersistentConfig();
+      }
+    };
+
+    videoFileInput.addEventListener('change', (e) => {
+      const files = Array.from(e.target.files).filter(f => f.type.startsWith('video/') || /\.(mp4|webm|ogg)$/i.test(f.name));
+      if (!files.length) return;
+      const slots = 20 - state.videos.length;
+      files.slice(0, slots).forEach(file => {
+        state.videos.push({
+          id: 'local_vid_' + Date.now() + '_' + file.name,
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          blob: file,
+          url: URL.createObjectURL(file),
+          sourceUrl: ''
+        });
+      });
+      renderVideoList();
+      dbSaveAllVideos(state.videos);
+      savePersistentConfig();
+      e.target.value = '';
+    });
+
+    function renderBgmList() {
+      if (!bgmListEl) return;
+      bgmListEl.innerHTML = '';
+
+      if (state.bgmList.length === 0) {
+        emptyBgmMsg.classList.remove('hidden');
+        bgmListEl.classList.add('hidden');
+        bgmStatusText.textContent = '음악 미등록 (최대 100곡 등록 가능)';
+      } else {
+        emptyBgmMsg.classList.add('hidden');
+        bgmListEl.classList.remove('hidden');
+
+        state.bgmList.forEach((audio, index) => {
+          const isCurrent = state.isBgmPlaying && state.currentBgmIdx === index;
+          const li = document.createElement('li');
+          li.className = `flex items-center justify-between p-2 rounded-xl border text-xs font-medium shadow-xs transition-all ${
+            isCurrent
+              ? 'bg-amber-50/90 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700/60 text-amber-900 dark:text-amber-200 font-bold'
+              : 'bg-white/70 dark:bg-slate-800/80 border-slate-200/80 dark:border-slate-700 text-slate-700 dark:text-slate-200'
+          }`;
+          li.innerHTML = `
+            <div class="flex items-center gap-2 truncate pr-2">
+              <span class="w-5 h-5 rounded-full ${isCurrent ? 'bg-amber-500 text-white' : 'bg-amber-100 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300'} flex items-center justify-center font-bold text-[10px] shrink-0">${index + 1}</span>
+              <span class="truncate">${audio.name}</span>
+              <span class="text-[9px] px-1 py-0.5 rounded bg-slate-200/80 dark:bg-slate-700 text-slate-500 dark:text-slate-400 font-mono shrink-0">${formatFileSize(audio.size)}</span>
+              ${audio.sourceUrl ? '<span class="text-[8px] px-1 rounded bg-amber-200 dark:bg-amber-900 text-amber-800 dark:text-amber-200">구글드라이브</span>' : ''}
+            </div>
+            <div class="flex items-center gap-1 shrink-0">
+              <button onclick="playBgmIndex(${index})" class="p-1 rounded-md text-amber-600 hover:bg-amber-100 dark:hover:bg-amber-900/40" title="이 곡 재생">
+                <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+              </button>
+              <button onclick="removeBgm(${index})" class="text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/50 p-1 rounded-md transition" title="삭제">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+              </button>
+            </div>
+          `;
+          bgmListEl.appendChild(li);
+        });
+      }
+      updateBgmUI();
+    }
+
+    window.removeBgm = function(index) {
+      if (state.bgmList[index]) {
+        if (state.bgmList[index].url) URL.revokeObjectURL(state.bgmList[index].url);
+        state.bgmList.splice(index, 1);
+        if (state.bgmList.length === 0) {
+          bgmAudio.pause();
+          bgmAudio.src = '';
+          state.isBgmPlaying = false;
+        }
+        renderBgmList();
+        dbSaveAllAudios(state.bgmList);
+        savePersistentConfig();
+      }
+    };
+
+    bgmFileInput.addEventListener('change', (e) => {
+      const files = Array.from(e.target.files).filter(f => f.type.startsWith('audio/') || /\.(mp3|wav|ogg|m4a|aac)$/i.test(f.name));
+      if (!files.length) return;
+      const slots = 100 - state.bgmList.length;
+      files.slice(0, slots).forEach(file => {
+        state.bgmList.push({
+          id: 'local_aud_' + Date.now() + '_' + file.name,
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          blob: file,
+          url: URL.createObjectURL(file),
+          sourceUrl: ''
+        });
+      });
+      renderBgmList();
+      dbSaveAllAudios(state.bgmList);
+      savePersistentConfig();
+      if (!state.isBgmPlaying && state.bgmList.length > 0) {
+        forcePlayBgm(0);
+      }
+      e.target.value = '';
+    });
+
+    function forcePlayBgm(idx = 0) {
+      if (!state.bgmList || state.bgmList.length === 0) return;
+      state.currentBgmIdx = idx % state.bgmList.length;
+      const track = state.bgmList[state.currentBgmIdx];
+
+      initWebAudioGraph();
+      if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+
+      bgmAudio.src = track.url;
+      bgmAudio.load();
+
+      const playPromise = bgmAudio.play();
+      if (playPromise !== undefined) {
+        playPromise.then(() => {
+          state.isBgmPlaying = true;
+          renderBgmList();
+        }).catch(() => {
+          state.isBgmPlaying = false;
+          renderBgmList();
+        });
+      }
+    }
+
+    function playBgmIndex(idx) {
+      forcePlayBgm(idx);
+    }
+
+    bgmAudio.addEventListener('ended', () => {
+      playBgmIndex(state.currentBgmIdx + 1);
+    });
+
+    btnToggleBgm.addEventListener('click', () => {
+      if (!state.bgmList.length) {
+        showFloatingToast('먼저 배경음악 파일을 등록해주세요.');
+        return;
+      }
+      initWebAudioGraph();
+      if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+
+      if (state.isBgmPlaying) {
+        bgmAudio.pause();
+        state.isBgmPlaying = false;
+      } else {
+        if (!bgmAudio.src) playBgmIndex(0);
+        else {
+          bgmAudio.play();
+          state.isBgmPlaying = true;
+        }
+      }
+      renderBgmList();
+    });
+
+    bgmVolume.addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value);
+      bgmAudio.volume = val;
+      bgmVolumeLabel.textContent = `${Math.round(val * 100)}%`;
+    });
+
+    function updateBgmUI() {
+      if (state.isBgmPlaying) {
+        iconBgmPlay.classList.add('hidden');
+        iconBgmPause.classList.remove('hidden');
+        const track = state.bgmList[state.currentBgmIdx];
+        bgmStatusText.textContent = `[재생 중 ${state.currentBgmIdx + 1}/${state.bgmList.length}] ${track ? track.name : ''}`;
+      } else {
+        iconBgmPlay.classList.remove('hidden');
+        iconBgmPause.classList.add('hidden');
+        bgmStatusText.textContent = state.bgmList.length > 0 ? `일시정지됨 (${state.bgmList.length}곡)` : '음악 미등록';
+      }
+    }
+
+    // -------------------------------------------------------------
+    // 6. 비디오 플레이어 및 화면 전환 로직
+    // -------------------------------------------------------------
+    const btnExitPlayer = document.getElementById('btn-exit-player');
+    const playerTouchSurface = document.getElementById('player-touch-surface');
+
+    btnStartKiosk.addEventListener('click', () => {
+      if (!state.videos.length) return;
+      viewHome.classList.add('hidden');
+      viewPlayer.classList.remove('hidden');
+      state.currentVideoIdx = 0;
+      playCurrentVideo();
+
+      if (state.bgmList.length > 0) forcePlayBgm(state.currentBgmIdx || 0);
+      if (document.documentElement.requestFullscreen) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      }
+    });
+
+    btnExitPlayer.addEventListener('click', (e) => {
+      e.stopPropagation();
+      kioskVideo.pause();
+      clearCalendarTimer();
+      viewPlayer.classList.add('hidden');
+      viewCalendar.classList.add('hidden');
+      viewHome.classList.remove('hidden');
+    });
+
+    function playCurrentVideo() {
+      if (!state.videos.length) return;
+      const target = state.videos[state.currentVideoIdx];
+      kioskVideo.src = target.url;
+      kioskVideo.muted = true;
+      kioskVideo.play().catch(e => console.warn('비디오 재생 재시도:', e));
+    }
+
+    kioskVideo.addEventListener('ended', () => {
+      const isLastVideo = (state.currentVideoIdx >= state.videos.length - 1);
+      if (isLastVideo) {
+        state.currentVideoIdx = 0;
+        kioskVideo.pause();
+        viewPlayer.classList.add('hidden');
+        showCalendarView(state.cycleCalendarDuration, 'cycle');
+      } else {
+        state.currentVideoIdx++;
+        playCurrentVideo();
+      }
+    });
+
+    const handleScreenClick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      kioskVideo.pause();
+      viewPlayer.classList.add('hidden');
+      showCalendarView(state.clickCalendarDuration, 'click');
+    };
+
+    playerTouchSurface.addEventListener('click', handleScreenClick);
+    playerTouchSurface.addEventListener('touchend', handleScreenClick);
+
+    // -------------------------------------------------------------
+    // 7. 달력 뷰 및 실시간 일정 렌더링
+    // -------------------------------------------------------------
+    const calendarProgressBar = document.getElementById('calendar-progress-bar');
+    const btnCloseCalendar = document.getElementById('btn-close-calendar');
+
+    function showCalendarView(durationSeconds) {
+      clearCalendarTimer();
+      state.calendarDate = new Date();
+      renderCalendar();
+      updateDailyQuote();
+      updateLiveClocks();
+
+      viewCalendar.classList.remove('hidden');
+      const totalDuration = durationSeconds * 1000;
+      const startTime = performance.now();
+
+      if (calendarProgressBar) calendarProgressBar.style.width = '100%';
+
+      function updateProgressBar(nowTime) {
+        const elapsed = nowTime - startTime;
+        const rem = Math.max(0, 1 - (elapsed / totalDuration));
+        if (calendarProgressBar) calendarProgressBar.style.width = `${(rem * 100).toFixed(1)}%`;
+        if (elapsed < totalDuration) {
+          state.calendarInterval = requestAnimationFrame(updateProgressBar);
+        } else {
+          returnToVideo();
+        }
+      }
+      state.calendarInterval = requestAnimationFrame(updateProgressBar);
+
+      state.calendarTimeout = setTimeout(() => {
+        returnToVideo();
+      }, totalDuration);
+    }
+
+    function clearCalendarTimer() {
+      if (state.calendarTimeout) clearTimeout(state.calendarTimeout);
+      if (state.calendarInterval) cancelAnimationFrame(state.calendarInterval);
+      state.calendarTimeout = null;
+      state.calendarInterval = null;
+    }
+
+    function returnToVideo() {
+      clearCalendarTimer();
+      viewCalendar.classList.add('hidden');
+      if (!viewHome.classList.contains('hidden')) return;
+      viewPlayer.classList.remove('hidden');
+      playCurrentVideo();
+    }
+
+    btnCloseCalendar.addEventListener('click', (e) => {
+      e.stopPropagation();
+      returnToVideo();
+    });
+
+    viewCalendar.addEventListener('click', (e) => {
+      if (e.target.closest('#btn-close-calendar') || e.target.closest('#btn-open-schedule-modal') || e.target.closest('.cal-day-cell') || e.target.closest('#modal-schedule') || e.target.closest('#btn-cal-reset-today')) return;
+      returnToVideo();
+    });
+
+    document.getElementById('btn-cal-reset-today').addEventListener('click', (e) => {
+      e.stopPropagation();
+      state.calendarDate = new Date();
+      renderCalendar();
+    });
+
+    function renderCalendar() {
+      const viewDate = state.calendarDate || new Date();
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      const currentMonth = now.getMonth();
+      const currentToday = now.getDate();
+
+      const year = viewDate.getFullYear();
+      const month = viewDate.getMonth();
+
+      document.getElementById('cal-month-title').textContent = `${year}년 ${month + 1}월`;
+
+      const firstDayIndex = new Date(year, month, 1).getDay();
+      const lastDate = new Date(year, month + 1, 0).getDate();
+      const prevLastDate = new Date(year, month, 0).getDate();
+
+      const grid = document.getElementById('cal-days-grid');
+      grid.innerHTML = '';
+
+      for (let i = firstDayIndex - 1; i >= 0; i--) {
+        const d = prevLastDate - i;
+        const cell = document.createElement('div');
+        cell.className = 'rounded-2xl sm:rounded-3xl flex flex-col items-center justify-start text-slate-300 dark:text-slate-700 font-bold text-lg sm:text-2xl p-1.5 opacity-40 h-full overflow-hidden';
+        cell.innerHTML = `<span>${d}</span>`;
+        grid.appendChild(cell);
+      }
+
+      for (let d = 1; d <= lastDate; d++) {
+        const isToday = (year === currentYear && month === currentMonth && d === currentToday);
+        const cellDate = new Date(year, month, d);
+        const dayOfWeek = cellDate.getDay();
+        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        const daySchedules = state.schedules.filter(s => s.date === dateStr);
+
+        const cell = document.createElement('div');
+        cell.className = `cal-day-cell rounded-2xl sm:rounded-3xl flex flex-col items-stretch justify-start p-1.5 sm:p-2 cursor-pointer transition shadow-sm hover:scale-[1.01] active:scale-95 h-full min-h-0 overflow-hidden ${
+          isToday
+            ? 'bg-blue-50/90 dark:bg-blue-950/40 border-2 border-blue-500 ring-2 sm:ring-4 ring-blue-300/50 dark:ring-blue-800/50'
+            : 'bg-white/50 dark:bg-slate-800/50 hover:bg-white/90 dark:hover:bg-slate-700/80 border border-slate-200/60 dark:border-slate-700/60'
+        }`;
+
+        cell.addEventListener('click', (e) => {
+          e.stopPropagation();
+          clearCalendarTimer();
+          openScheduleModal(dateStr);
+        });
+
+        const topRow = document.createElement('div');
+        topRow.className = 'flex items-center justify-between w-full mb-1 shrink-0';
+        let dayColor = 'text-slate-800 dark:text-slate-100';
+        if (dayOfWeek === 0) dayColor = 'text-rose-500';
+        else if (dayOfWeek === 6) dayColor = 'text-blue-500';
+
+        topRow.innerHTML = `
+          <span class="font-black text-lg sm:text-2xl ${dayColor} ${isToday ? 'px-1.5 py-0.5 rounded-lg bg-blue-600 !text-white' : ''}">${d}</span>
+          ${isToday ? '<span class="text-[9px] sm:text-[11px] font-black text-blue-600 dark:text-blue-400">오늘</span>' : ''}
+        `;
+        cell.appendChild(topRow);
+
+        const schedContainer = document.createElement('div');
+        schedContainer.className = 'schedule-scroll-box flex-1 min-h-0 flex flex-col gap-1.5 overflow-y-auto w-full text-left pr-0.5';
+
+        if (daySchedules.length > 0) {
+          daySchedules.forEach((item) => {
+            const badge = document.createElement('div');
+            badge.className = 'p-1.5 rounded-xl border bg-blue-50/95 dark:bg-blue-950/70 border-blue-200/90 dark:border-blue-800/80 shadow-xs flex flex-col gap-0.5 schedule-badge-wrap shrink-0';
+            const timeLabel = item.time ? item.time : '종일';
+            badge.innerHTML = `
+              <div class="flex items-center">
+                <span class="text-[9px] sm:text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md text-blue-700 dark:text-blue-300 bg-blue-100/80 dark:bg-blue-900/60 inline-flex items-center gap-1">
+                  ${timeLabel}
+                </span>
+              </div>
+              <div class="text-[10px] sm:text-xs font-semibold text-blue-950 dark:text-blue-100 leading-tight line-clamp-3 pt-0.5 px-0.5">
+                ${item.title}
+              </div>
+            `;
+            schedContainer.appendChild(badge);
+          });
+        }
+
+        cell.appendChild(schedContainer);
+        grid.appendChild(cell);
+      }
+
+      const totalRendered = firstDayIndex + lastDate;
+      const remainingCells = 42 - totalRendered;
+      for (let nextDay = 1; nextDay <= remainingCells; nextDay++) {
+        const cell = document.createElement('div');
+        cell.className = 'rounded-2xl sm:rounded-3xl flex flex-col items-center justify-start text-slate-300 dark:text-slate-700 font-bold text-lg sm:text-2xl p-1.5 opacity-40 h-full overflow-hidden';
+        cell.innerHTML = `<span>${nextDay}</span>`;
+        grid.appendChild(cell);
+      }
+    }
+
+    // -------------------------------------------------------------
+    // 8. 명언 및 시계
+    // -------------------------------------------------------------
+    const curatedQuotes = [
+      { kr: "내일 죽을 것처럼 살고, 영원히 살 것처럼 배워라.", en: "Live as if you were to die tomorrow. Learn as if you were to live forever.", author: "마하트마 간디" },
+      { kr: "기술만으로는 부족합니다. 기술과 인문학의 융합이 우리의 가슴을 뛰게 합니다.", en: "Technology alone is not enough.", author: "스티브 잡스" },
+      { kr: "성공은 매일 반복되는 작은 노력들의 총합이다.", en: "Success is the sum of small efforts, repeated day in and day out.", author: "로버트 콜리어" },
+      { kr: "배움의 길에는 왕도가 없다.", en: "There is no royal road to learning.", author: "유클리드" }
+    ];
+
+    function updateDailyQuote() {
+      const now = new Date();
+      const startOfYear = new Date(now.getFullYear(), 0, 0);
+      const dayOfYear = Math.floor((now - startOfYear) / (1000 * 60 * 60 * 24));
+      const q = curatedQuotes[dayOfYear % curatedQuotes.length];
+      document.getElementById('quote-kr').textContent = `"${q.kr}"`;
+      document.getElementById('quote-en').textContent = `"${q.en}"`;
+      document.getElementById('quote-author').textContent = `— ${q.author}`;
+    }
+
+    function updateLiveClocks() {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const date = String(now.getDate()).padStart(2, '0');
+      const days = ['일', '월', '화', '수', '목', '금', '토'];
+      const dayName = days[now.getDay()];
+
+      const hours = String(now.getHours()).padStart(2, '0');
+      const minutes = String(now.getMinutes()).padStart(2, '0');
+
+      const bannerDate = document.getElementById('banner-date');
+      const bannerTime = document.getElementById('banner-time');
+      if (bannerDate) bannerDate.textContent = `${year}. ${month}. ${date} (${dayName})`;
+      if (bannerTime) bannerTime.textContent = `${hours}:${minutes}`;
+    }
+    setInterval(updateLiveClocks, 1000);
+
+    // -------------------------------------------------------------
+    // 9. 관리자 인증 및 이벤트 바인딩
+    // -------------------------------------------------------------
+    btnOpenAdminAuth.addEventListener('click', () => {
+      inputAdminPw.value = '';
+      authErrorMsg.classList.add('hidden');
+      modalAuth.classList.remove('hidden');
+      setTimeout(() => inputAdminPw.focus(), 100);
+    });
+
+    btnCancelAuth.addEventListener('click', () => modalAuth.classList.add('hidden'));
+
+    authForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      if (inputAdminPw.value.trim() === 'dbtjddyd') {
+        modalAuth.classList.add('hidden');
+        modalSettings.classList.remove('hidden');
+      } else {
+        authErrorMsg.classList.remove('hidden');
+        inputAdminPw.value = '';
+        inputAdminPw.focus();
+      }
+    });
+
+    btnModePortrait.addEventListener('click', () => applyDisplayMode('portrait'));
+    btnModeResponsive.addEventListener('click', () => applyDisplayMode('responsive'));
+
+    inputClickDuration.addEventListener('input', (e) => {
+      state.clickCalendarDuration = parseInt(e.target.value, 10);
+      clickDurationVal.textContent = `${state.clickCalendarDuration}초`;
+      savePersistentConfig();
+    });
+
+    inputCycleDuration.addEventListener('input', (e) => {
+      state.cycleCalendarDuration = parseInt(e.target.value, 10);
+      cycleDurationVal.textContent = `${state.cycleCalendarDuration}초`;
+      savePersistentConfig();
+    });
+
+    btnThemeLight.addEventListener('click', () => applyTheme('light', true));
+    btnThemeDark.addEventListener('click', () => applyTheme('dark', true));
+    selectFont.addEventListener('change', (e) => applyFont(e.target.value, true));
+
+    toggleAutoBoot.addEventListener('change', (e) => {
+      state.autoBootRestore = e.target.checked;
+      savePersistentConfig();
+    });
+
+    // 구글 시트 저장 및 테스트 버튼
+    btnSaveSettings.addEventListener('click', () => {
+      state.sheetVideosUrl = cfgSheetVideos.value.trim();
+      state.sheetAudiosUrl = cfgSheetAudios.value.trim();
+      state.sheetSchedulesUrl = cfgSheetSchedules.value.trim();
+      savePersistentConfig();
+      modalSettings.classList.add('hidden');
+      showFloatingToast('설정이 저장되었습니다. 클라우드 동기화를 시작합니다.');
+      syncCloudSpreadsheet(true);
+    });
+
+    btnModalTestSync.addEventListener('click', () => {
+      state.sheetVideosUrl = cfgSheetVideos.value.trim();
+      state.sheetAudiosUrl = cfgSheetAudios.value.trim();
+      state.sheetSchedulesUrl = cfgSheetSchedules.value.trim();
+      syncCloudSpreadsheet(true);
+    });
+
+    btnManualSync.addEventListener('click', () => {
+      syncCloudSpreadsheet(true);
+    });
+
+    btnCloseSettings.addEventListener('click', () => modalSettings.classList.add('hidden'));
+
+    // 학사일정 등록 모달
+    const modalSchedule = document.getElementById('modal-schedule');
+    const scheduleForm = document.getElementById('schedule-form');
+    const scheduleInputDate = document.getElementById('schedule-input-date');
+    const scheduleInputTime = document.getElementById('schedule-input-time');
+    const scheduleInputTitle = document.getElementById('schedule-input-title');
+    const btnOpenScheduleModal = document.getElementById('btn-open-schedule-modal');
+    const btnCloseScheduleModal = document.getElementById('btn-close-schedule-modal');
+    const btnCancelSchedule = document.getElementById('btn-cancel-schedule');
+    const scheduleExistingContainer = document.getElementById('schedule-existing-container');
+    const scheduleExistingList = document.getElementById('schedule-existing-list');
+
+    function openScheduleModal(defaultDate) {
+      clearCalendarTimer();
+      const now = new Date();
+      scheduleInputDate.value = defaultDate || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      scheduleInputTime.value = '';
+      scheduleInputTitle.value = '';
+      updateExistingSchedulesUI(scheduleInputDate.value);
+      modalSchedule.classList.remove('hidden');
+      scheduleInputTitle.focus();
+    }
+
+    function closeScheduleModal() {
+      modalSchedule.classList.add('hidden');
+      showCalendarView(state.clickCalendarDuration);
+    }
+
+    function updateExistingSchedulesUI(dateStr) {
+      const filtered = state.schedules.filter(s => s.date === dateStr);
+      scheduleExistingList.innerHTML = '';
+      if (filtered.length > 0) {
+        scheduleExistingContainer.classList.remove('hidden');
+        filtered.forEach(s => {
+          const item = document.createElement('div');
+          item.className = 'flex items-center justify-between p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs';
+          item.innerHTML = `
+            <div class="truncate mr-2">
+              <span class="font-mono text-blue-600 dark:text-blue-400 font-bold">${s.time ? s.time + ' ' : ''}</span>
+              <span class="font-semibold text-slate-800 dark:text-slate-100">${s.title}</span>
+            </div>
+            <button type="button" onclick="deleteScheduleItem('${s.id}')" class="text-rose-500 hover:text-rose-700 p-1 font-bold">삭제</button>
+          `;
+          scheduleExistingList.appendChild(item);
+        });
+      } else {
+        scheduleExistingContainer.classList.add('hidden');
+      }
+    }
+
+    scheduleInputDate.addEventListener('change', () => updateExistingSchedulesUI(scheduleInputDate.value));
+    btnOpenScheduleModal.addEventListener('click', (e) => { e.stopPropagation(); openScheduleModal(); });
+    btnCloseScheduleModal.addEventListener('click', closeScheduleModal);
+    btnCancelSchedule.addEventListener('click', closeScheduleModal);
+
+    scheduleForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const dateVal = scheduleInputDate.value;
+      const timeVal = scheduleInputTime.value;
+      const titleVal = scheduleInputTitle.value.trim();
+
+      if (!dateVal || !titleVal) return;
+      state.schedules.push({
+        id: 'sch_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+        date: dateVal,
+        time: timeVal,
+        title: titleVal
+      });
+      state.schedules.sort((a, b) => (a.date + ' ' + (a.time || '')).localeCompare(b.date + ' ' + (b.time || '')));
+      savePersistentConfig();
+      renderCalendar();
+      closeScheduleModal();
+      showFloatingToast('새로운 학사 일정이 등록되었습니다.');
+    });
+
+    window.deleteScheduleItem = function(id) {
+      state.schedules = state.schedules.filter(s => s.id !== id);
+      savePersistentConfig();
+      renderCalendar();
+      updateExistingSchedulesUI(scheduleInputDate.value);
+    };
+
+    function showFloatingToast(message) {
+      let toast = document.getElementById('kiosk-toast');
+      if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'kiosk-toast';
+        toast.className = 'fixed bottom-8 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-2xl bg-slate-900/90 text-white text-sm font-semibold shadow-2xl backdrop-blur-md transition-all duration-300 pointer-events-none opacity-0';
+        document.body.appendChild(toast);
+      }
+      toast.textContent = message;
+      toast.classList.remove('opacity-0');
+      toast.classList.add('opacity-100');
+      setTimeout(() => {
+        toast.classList.remove('opacity-100');
+        toast.classList.add('opacity-0');
+      }, 3000);
+    }
+
+    // -------------------------------------------------------------
+    // 10. 초기 로딩 및 10분 주기 백그라운드 동기화 스케줄러
+    // -------------------------------------------------------------
+    async function restoreSavedMedia() {
+      try {
+        const storedVideos = await dbLoadAllVideos();
+        if (storedVideos && storedVideos.length > 0) {
+          state.videos = storedVideos.map(item => ({
+            id: item.id,
+            name: item.name,
+            size: item.size,
+            type: item.type,
+            blob: item.blob,
+            url: URL.createObjectURL(item.blob),
+            sourceUrl: item.sourceUrl
+          }));
+          renderVideoList();
+        }
+
+        const storedAudios = await dbLoadAllAudios();
+        if (storedAudios && storedAudios.length > 0) {
+          state.bgmList = storedAudios.map(item => ({
+            id: item.id,
+            name: item.name,
+            size: item.size,
+            type: item.type,
+            blob: item.blob,
+            url: URL.createObjectURL(item.blob),
+            sourceUrl: item.sourceUrl
+          }));
+          renderBgmList();
+        }
+
+        if (state.autoBootRestore && state.videos.length > 0) {
+          showFloatingToast('로컬 캐시된 영상으로 키오스크를 자동 실행합니다.');
+          setTimeout(() => {
+            viewHome.classList.add('hidden');
+            viewPlayer.classList.remove('hidden');
+            state.currentVideoIdx = 0;
+            playCurrentVideo();
+            if (state.bgmList.length > 0) forcePlayBgm(0);
+          }, 1000);
+        }
+      } catch (err) {
+        console.warn('미디어 복원 중 오류:', err);
+      }
+    }
+
+    window.onload = async function() {
+      if (bgmAudio) bgmAudio.volume = 0.3;
+      loadSavedSettings();
+      renderCalendar();
+      updateDailyQuote();
+      updateLiveClocks();
+      await restoreSavedMedia();
+
+      // 첫 부팅 시 즉시 1회 클라우드 동기화 시도
+      if (state.sheetVideosUrl || state.sheetAudiosUrl || state.sheetSchedulesUrl) {
+        syncCloudSpreadsheet(false);
+      }
+
+      // [추천 모델 A 핵심] 10분마다 자동으로 구글 스프레드시트 CSV 확인 및 캐싱
+      setInterval(() => {
+        if (state.sheetVideosUrl || state.sheetAudiosUrl || state.sheetSchedulesUrl) {
+          console.log('[Kiosk] 10분 주기 구글 드라이브/시트 자동 동기화 실행');
+          syncCloudSpreadsheet(false);
+        }
+      }, 10 * 60 * 1000);
+
+      const unlockAudio = () => {
+        initWebAudioGraph();
+        if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+      };
+      window.addEventListener('click', unlockAudio, { once: true });
+      window.addEventListener('touchstart', unlockAudio, { once: true });
+    };
+  </script>
+</body>
+</html>
